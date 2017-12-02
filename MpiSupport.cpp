@@ -4,7 +4,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-string CMpiException::makeErrorText() const {
+string CMpiException::makeErrorText() const { // Вызывается в конструкторе exception
     ostringstream oss;
     oss << "MPI function '" << FunctionName() << "'"
         << " has failed with code '" << ErrorCode() << "'.";

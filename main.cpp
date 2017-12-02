@@ -43,9 +43,9 @@ private:
 ///////////////////////////////////////////////////////////////////////////////
 
 void CExchangeDefinition::DoExchange(CMatrix &matrix) {
-    sendBuffer.clear();
+    sendBuffer.clear(); // Очищаем значения, которые посылали в прошлый раз (это вектор)
     for (size_t x = sendPart.BeginX;
-         x < sendPart.EndX; x++) { // пушим в буффер для отравки нужную часть матрицы (часть колонки или стобца)
+         x < sendPart.EndX; x++) { // пушим в буффер для отправки нужную часть матрицы (часть колонки или стобца)
         for (size_t y = sendPart.BeginY; y < sendPart.EndY; y++) {
             sendBuffer.push_back(matrix(x, y));
         }
@@ -117,8 +117,8 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void GetBeginEndPoints(const size_t numberOfPoints, const size_t numberOfBlocks,
-                       const size_t blockIndex, size_t &beginPoint,
+void GetBeginEndPoints(const size_t numberOfPoints, const size_t numberOfBlocks /* кол-во блоков по абциссе или ординате */,
+                       const size_t blockIndex /* текущий номер блока */, size_t &beginPoint,
                        size_t &endPoint) { // Считаем начало и конец отрезка абциссы или ординаты, обрабатываемого процессом
     const size_t objectsPerProcess = numberOfPoints / numberOfBlocks;
     const size_t additionalPoints = numberOfPoints % numberOfBlocks;
@@ -178,6 +178,7 @@ private:
     CMatrix r; // Направление движения к следующему приближжению на 1 итерации
     CMatrix g; // Направление движения к следующему приближжению
     NumericType difference; // Невязка
+    NumericType difference_2; // Сумма квадратов разниц (для AllReduceDifference)
 
     CProgram(size_t pointsX, size_t pointsY, const CArea &area);
 
@@ -347,7 +348,7 @@ void CProgram::allReduceFraction(CFraction &fraction) {
 }
 
 void CProgram::allReduceDifference() {
-    NumericType buffer = difference * difference;
+    NumericType buffer = difference_2;
     MpiCheck( // проверяем на MPI_SUCCESS == 0
             MPI_Allreduce(MPI_IN_PLACE, // input buffer == output buffer
                           &buffer, // адресс переменной, с данными запроса-ответа
@@ -366,24 +367,24 @@ void CProgram::iteration0() {
 
     if (!hasLeftNeighbor()) {
         for (size_t y = 0; y < p.SizeY(); y++) {
-            p(0, y) = Phi(grid.X[0], grid.Y[y]);
+            p(0, y) = Phi(grid.X[0], grid.Y[y]); // Phi - граничная функция
         }
     }
     if (!hasRightNeighbor()) {
         const size_t left = p.SizeX() - 1;
         for (size_t y = 0; y < p.SizeY(); y++) {
-            p(left, y) = Phi(grid.X[left], grid.Y[y]);
+            p(left, y) = Phi(grid.X[left], grid.Y[y]); // Phi - граничная функция
         }
     }
     if (!hasTopNeighbor()) {
         for (size_t x = 0; x < p.SizeX(); x++) {
-            p(x, 0) = Phi(grid.X[x], grid.Y[0]);
+            p(x, 0) = Phi(grid.X[x], grid.Y[0]); // Phi - граничная функция
         }
     }
     if (!hasBottomNeighbor()) {
         const size_t bottom = p.SizeY() - 1;
         for (size_t x = 0; x < p.SizeX(); x++) {
-            p(x, bottom) = Phi(grid.X[x], grid.Y[bottom]);
+            p(x, bottom) = Phi(grid.X[x], grid.Y[bottom]); // Phi - граничная функция
         }
     }
 }
@@ -398,6 +399,7 @@ void CProgram::iteration1() {
     allReduceFraction(tau);
 
     difference = CalcP(r, tau.Value(), p);
+    difference_2 = CalcP_2(r, tau.Value(), p);
     allReduceDifference();
 
     g = r;
@@ -419,6 +421,7 @@ void CProgram::iteration2() {
     allReduceFraction(tau);
 
     difference = CalcP(g, tau.Value(), p);
+    difference_2 = CalcP_2(g, tau.Value(), p);
     allReduceDifference();
 }
 

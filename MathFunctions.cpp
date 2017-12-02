@@ -58,6 +58,19 @@ NumericType CalcP(const CMatrix &g, const NumericType tau, CMatrix &p) {
     return static_cast<NumericType> (pow(squares, 0.5));
 }
 
+// Вычисление значений pij во внутренних точках, возвращается сумма квадратов.
+NumericType CalcP_2(const CMatrix &g, const NumericType tau, CMatrix &p) {
+    NumericType squares = 0;
+    for (size_t x = 1; x < p.SizeX() - 1; x++) {
+        for (size_t y = 1; y < p.SizeY() - 1; y++) {
+            const NumericType newValue = p(x, y) - tau * g(x, y); // считаем новое значение
+            squares += (newValue - p(x, y)) * (newValue - p(x, y)); // добавляем квадрат разницы компоненты
+            p(x, y) = newValue; // присваиваем новое значение
+        }
+    }
+    return static_cast<NumericType> (squares);
+}
+
 // Вычисление alpha.
 CFraction CalcAlpha(const CMatrix &r, const CMatrix &g, const CUniformGrid &grid) {
     NumericType numerator = 0;
